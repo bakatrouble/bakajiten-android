@@ -67,7 +67,13 @@ jobs:
       - name: Install platform + NDK.
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platforms;android-37" "ndk;${{ env.NDK_VERSION }}"
+          # compileSdk 37 has no upstream platform yet: stand in the
+          # newest real one under the 37 name (same trick as local
+          # dev, which relabels a platform dir to android-37).
+          sdkmanager "platforms;android-36" "ndk;${{ env.NDK_VERSION }}"
+          cp -r "$ANDROID_HOME/platforms/android-36" "$ANDROID_HOME/platforms/android-37"
+          sed -i 's/^AndroidVersion.ApiLevel=.*/AndroidVersion.ApiLevel=37/' \
+            "$ANDROID_HOME/platforms/android-37/source.properties"
 
       - name: Set up Rust.
         uses: dtolnay/rust-toolchain@stable
