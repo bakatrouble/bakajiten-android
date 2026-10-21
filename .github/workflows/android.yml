@@ -1,0 +1,168 @@
+name: Android
+
+# The app lives in its own repo (like qt/web own theirs), but the
+# Rust backend stays in bakatrouble/bakajiten: CI checks that repo
+# out underneath and builds the nested layout the Gradle scripts
+# expect (repoRoot resolves to app/../..). Bindings and device .so
+# files always generate from that workspace at build time — nothing
+# generated is ever checked in (same never-drift rule as the other
+# frontends).
+#
+# Tags (v*) cut here own the Android releases, mirroring
+# bakajiten-qt: pushing a tag publishes a GitHub Release with the
+# APKs. A debug APK is always attached (installable); a signed
+# release APK is attached when the ANDROID_KEYSTORE_* secrets are
+# set, otherwise the unsigned release APK is attached as-is.
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      backend_ref:
+        description: 'bakatrouble/bakajiten ref for lib/ + the Cargo workspace'
+        default: 'master'
+
+env:
+  BACKEND_REPO: bakatrouble/bakajiten
+  BACKEND_REF: ${{ github.event.inputs.backend_ref || 'master' }}
+  NDK_VERSION: 27.0.12077973
+  UNIFFI_VERSION: 0.31.2
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the backend workspace.
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BACKEND_REPO }}
+          ref: ${{ env.BACKEND_REF }}
+          path: ws
+
+      - name: Check out the app.
+        uses: actions/checkout@v4
+        with:
+          # Nested under the workspace: Gradle resolves repoRoot to
+          # app/../.., i.e. ws/ with lib/ + Cargo.* beside it.
+          path: ws/frontends/android
+
+      - name: Set up JDK 17.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up the Android SDK.
+        uses: android-actions/setup-android@v3
+
+      - name: Install platform + NDK.
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platforms;android-37" "ndk;${{ env.NDK_VERSION }}"
+
+      - name: Set up Rust.
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Cache Rust (registry + workspace target).
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ws
+
+      - name: Cache cargo-installed tools.
+        id: cargo-bin-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-${{ runner.os }}-uniffi-${{ env.UNIFFI_VERSION }}
+
+      - name: Install build tools.
+        if: steps.cargo-bin-cache.outputs.cache-hit != 'true'
+        run: |
+          cargo install uniffi-bindgen --version "${{ env.UNIFFI_VERSION }}" --locked --features cli
+          cargo install cargo-ndk
+
+      - name: Set up Gradle caching.
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test + build APKs.
+        working-directory: ws/frontends/android
+        # gradle.properties pins org.gradle.java.home to a local
+        # path; the CLI flag wins over it so CI uses setup-java's JDK.
+        run: >
+          ./gradlew :app:testDebugUnitTest
+          :app:assembleDebug :app:assembleRelease
+          -Dorg.gradle.java.home="$JAVA_HOME"
+          --console=plain
+
+      - name: Upload APKs.
+        uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: |
+            ws/frontends/android/app/build/outputs/apk/debug/app-debug.apk
+            ws/frontends/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Download APKs.
+        uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: apks
+
+      - name: Set up the Android SDK (apksigner).
+        if: env.HAS_KEYSTORE == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Sign the release APK.
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_STORE_PASSWORD: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          SRC=apks/app-release-unsigned.apk
+          "$BT"/zipalign -p -f 4 "$SRC" /tmp/aligned.apk
+          "$BT"/apksigner sign --ks /tmp/release.keystore \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass:env ANDROID_KEY_STORE_PASSWORD \
+            --key-pass:env ANDROID_KEY_PASSWORD \
+            --out "apks/bakajiten-android-${TAG}.apk" /tmp/aligned.apk
+          rm -f /tmp/release.keystore /tmp/aligned.apk
+
+      - name: Stage release files.
+        run: |
+          cd apks
+          mv app-debug.apk "bakajiten-android-${TAG}-debug.apk"
+          if [ "${HAS_KEYSTORE}" = "true" ]; then
+            rm -f app-release-unsigned.apk
+          else
+            mv app-release-unsigned.apk "bakajiten-android-${TAG}-release-unsigned.apk"
+          fi
+          ls -la
+
+      - name: Publish the GitHub release.
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apks/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
