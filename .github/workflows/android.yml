@@ -59,6 +59,10 @@ jobs:
 
       - name: Set up the Android SDK.
         uses: android-actions/setup-android@v3
+        with:
+          # Action default pulls the obsolete `tools` package (gone
+          # from the repo); platform-tools is all we need here.
+          packages: platform-tools
 
       - name: Install platform + NDK.
         run: |
@@ -129,6 +133,8 @@ jobs:
       - name: Set up the Android SDK (apksigner).
         if: env.HAS_KEYSTORE == 'true'
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Sign the release APK.
         if: env.HAS_KEYSTORE == 'true'
