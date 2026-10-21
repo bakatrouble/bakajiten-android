@@ -146,7 +146,7 @@ jobs:
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          SRC=apks/app-release-unsigned.apk
+          SRC=apks/release/app-release-unsigned.apk
           "$BT"/zipalign -p -f 4 "$SRC" /tmp/aligned.apk
           "$BT"/apksigner sign --ks /tmp/release.keystore \
             --ks-key-alias "$ANDROID_KEY_ALIAS" \
@@ -158,11 +158,11 @@ jobs:
       - name: Stage release files.
         run: |
           cd apks
-          mv app-debug.apk "bakajiten-android-${TAG}-debug.apk"
+          mv debug/app-debug.apk "bakajiten-android-${TAG}-debug.apk"
           if [ "${HAS_KEYSTORE}" = "true" ]; then
-            rm -f app-release-unsigned.apk
+            rm -f release/app-release-unsigned.apk
           else
-            mv app-release-unsigned.apk "bakajiten-android-${TAG}-release-unsigned.apk"
+            mv release/app-release-unsigned.apk "bakajiten-android-${TAG}-release-unsigned.apk"
           fi
           ls -la
 
