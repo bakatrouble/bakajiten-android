@@ -60,4 +60,17 @@ class SettingsDataStoreTest {
     repo.update { it.copy(densityDpi = null) }
     assertEquals(null, repo.settings.first().densityDpi)
   }
+
+  @Test fun updatePrefsRoundTrip() = runTest {
+    val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    val repo = DataStoreSettingsRepository(context)
+    assertEquals(true, repo.settings.first().checkAppUpdates)
+    assertEquals(null, repo.settings.first().skippedAppVersion)
+    repo.update { it.copy(checkAppUpdates = false, skippedAppVersion = "0.2.0") }
+    assertEquals(false, repo.settings.first().checkAppUpdates)
+    assertEquals("0.2.0", repo.settings.first().skippedAppVersion)
+    repo.update { it.copy(checkAppUpdates = true, skippedAppVersion = null) }
+    assertEquals(true, repo.settings.first().checkAppUpdates)
+    assertEquals(null, repo.settings.first().skippedAppVersion)
+  }
 }

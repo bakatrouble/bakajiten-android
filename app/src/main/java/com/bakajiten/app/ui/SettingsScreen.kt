@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -46,6 +47,7 @@ import com.bakajiten.app.data.AppSettings
 import com.bakajiten.app.data.RomajiStyle
 import com.bakajiten.app.data.SearchBarPosition
 import com.bakajiten.app.data.Theme
+import com.bakajiten.app.data.UpdateUiState
 import com.bakajiten.app.theme.BakajitenTheme
 
 // Settings apply instantly (no Apply/Cancel), like the web
@@ -63,6 +65,8 @@ fun SettingsScreen(
   onSettings: (AppSettings) -> Unit,
   onBack: () -> Unit,
   onDictionaries: () -> Unit,
+  update: UpdateUiState = UpdateUiState(),
+  onCheckUpdates: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   // The dpi slider previews locally and commits on release; its
@@ -186,7 +190,73 @@ fun SettingsScreen(
           modifier = Modifier.testTag("dictionariesRow"),
         )
       }
+      SettingsGroup(
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+        modifier = Modifier.padding(bottom = 16.dp),
+      ) {
+        SettingsToggleRow(
+          title = "Check for updates automatically",
+          checked = settings.checkAppUpdates,
+          onChecked = { onSettings(settings.copy(checkAppUpdates = it)) },
+          tag = "autoUpdate",
+          rowTag = "autoUpdateRow",
+          index = 0,
+          count = 2,
+          colors = colors,
+        )
+        SettingsMenuLink(
+          title = { Text("Check for app updates") },
+          subtitle = {
+            Text(if (update.checking) "Checking…" else updateSubtitle(update))
+          },
+          colors = colors,
+          shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+          action = {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+          },
+          onClick = onCheckUpdates,
+          modifier = Modifier.testTag("checkUpdatesRow"),
+        )
+      }
     }
+  }
+}
+
+// Status line under the manual check row: what the last check
+// found (empty until the first manual check reports).
+private fun updateSubtitle(update: UpdateUiState): String = when {
+  update.release != null -> "bakajiten ${update.release.version} is available"
+  update.seenVersion != null -> "bakajiten ${update.seenVersion} is available"
+  update.notice != null -> update.notice
+  else -> "Up to date"
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SettingsToggleRow(
+  title: String,
+  checked: Boolean,
+  onChecked: (Boolean) -> Unit,
+  tag: String,
+  rowTag: String,
+  index: Int,
+  count: Int,
+  colors: ListItemColors,
+) {
+  SegmentedListItem(
+    onClick = { onChecked(!checked) },
+    shapes = ListItemDefaults.segmentedShapes(index = index, count = count),
+    trailingContent = {
+      Switch(
+        checked = checked,
+        onCheckedChange = onChecked,
+        modifier = Modifier.testTag(tag),
+      )
+    },
+    colors = colors,
+    modifier = Modifier.testTag(rowTag),
+  ) {
+    Text(title)
   }
 }
 

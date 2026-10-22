@@ -1,5 +1,6 @@
 package com.bakajiten.app.di
 
+import com.bakajiten.app.data.AppUpdater
 import com.bakajiten.app.data.DataManager
 import com.bakajiten.app.data.DataStoreSettingsRepository
 import com.bakajiten.app.data.FakeDictionaryBackend
@@ -60,6 +61,7 @@ private fun fakeBackends(): Backends {
 val appModule = module {
   single { DataManager(androidContext().filesDir) }
   single<SettingsRepository> { DataStoreSettingsRepository(androidContext()) }
+  single { AppUpdater(androidContext(), get()) }
   single { createBackends(get()) }
   viewModel { AppViewModel(get(), get()) }
 }

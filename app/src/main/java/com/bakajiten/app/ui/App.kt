@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.bakajiten.app.data.UpdateUiState
 import com.bakajiten.app.data.cannedBackends
 import com.bakajiten.app.data.Candidate
 import com.bakajiten.app.data.DataManager
@@ -67,6 +68,8 @@ fun BakajitenApp(
   widthClass: AdaptiveWidth,
   dataScreen: (@Composable () -> Unit)? = null,
   manager: DataManager? = null,
+  update: UpdateUiState = UpdateUiState(),
+  onCheckUpdates: () -> Unit = {},
 ) {
   val ui by vm.ui.collectAsState()
   val settings by vm.settings.collectAsState()
@@ -117,6 +120,8 @@ fun BakajitenApp(
           { vm.updateSettings { _ -> it } },
           { vm.back() },
           { vm.go(Screen.Dictionaries) },
+          update = update,
+          onCheckUpdates = onCheckUpdates,
         )
         is Screen.Dictionaries -> {
           if (manager != null) {

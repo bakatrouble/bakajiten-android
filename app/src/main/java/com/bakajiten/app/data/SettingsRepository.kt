@@ -38,6 +38,10 @@ data class AppSettings(
   val prefix: Boolean = true,
   val suffix: Boolean = false,
   val meaning: Boolean = false,
+  /** Automatic app-update checks (startup + hourly). Off opts out. */
+  val checkAppUpdates: Boolean = true,
+  /** App version the user asked not to be notified about (null = notify about everything newer). */
+  val skippedAppVersion: String? = null,
 )
 
 interface SettingsRepository {
@@ -63,6 +67,8 @@ class DataStoreSettingsRepository(context: Context) : SettingsRepository {
     prefix = p[booleanPreferencesKey("prefix")] ?: true,
     suffix = p[booleanPreferencesKey("suffix")] ?: false,
     meaning = p[booleanPreferencesKey("meaning")] ?: false,
+    checkAppUpdates = p[booleanPreferencesKey("check_app_updates")] ?: true,
+    skippedAppVersion = p[stringPreferencesKey("skipped_app_version")],
   )
 
   override val settings: Flow<AppSettings> = store.data.map(::prefs)
@@ -94,6 +100,13 @@ class DataStoreSettingsRepository(context: Context) : SettingsRepository {
       p[booleanPreferencesKey("prefix")] = next.prefix
       p[booleanPreferencesKey("suffix")] = next.suffix
       p[booleanPreferencesKey("meaning")] = next.meaning
+      p[booleanPreferencesKey("check_app_updates")] = next.checkAppUpdates
+      val skipped = next.skippedAppVersion
+      if (skipped == null) {
+        p.remove(stringPreferencesKey("skipped_app_version"))
+      } else {
+        p[stringPreferencesKey("skipped_app_version")] = skipped
+      }
       // Retired strip-visibility keys: drop them on the next write.
       p.remove(booleanPreferencesKey("kanji_strip_similar"))
       p.remove(booleanPreferencesKey("kanji_strip_parts"))

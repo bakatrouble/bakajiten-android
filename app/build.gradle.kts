@@ -56,6 +56,8 @@ android {
 
   buildFeatures {
     compose = true
+    // AppUpdater reads the running version for release checks.
+    buildConfig = true
   }
 
   testOptions {

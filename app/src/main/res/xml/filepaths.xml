@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Self-update hand-off: the downloaded APK sits in
+  <cache>/updates and is served read-only to the installer. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>
