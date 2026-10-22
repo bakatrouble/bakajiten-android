@@ -127,7 +127,7 @@ jobs:
       TAG: ${{ github.ref_name }}
     steps:
       - name: Download APKs.
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: apks
           path: apks
@@ -150,8 +150,8 @@ jobs:
           "$BT"/zipalign -p -f 4 "$SRC" /tmp/aligned.apk
           "$BT"/apksigner sign --ks /tmp/release.keystore \
             --ks-key-alias "$ANDROID_KEY_ALIAS" \
-            --ks-pass:env ANDROID_KEY_STORE_PASSWORD \
-            --key-pass:env ANDROID_KEY_PASSWORD \
+            --ks-pass "env:ANDROID_KEY_STORE_PASSWORD" \
+            --key-pass "env:ANDROID_KEY_PASSWORD" \
             --out "apks/bakajiten-android-${TAG}.apk" /tmp/aligned.apk
           rm -f /tmp/release.keystore /tmp/aligned.apk
 
