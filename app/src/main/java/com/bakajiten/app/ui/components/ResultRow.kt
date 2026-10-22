@@ -12,8 +12,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import com.bakajiten.app.domain.SenseDisplay
-import com.bakajiten.app.domain.numberedContentSenses
+import com.bakajiten.app.data.RustShaping
+import com.bakajiten.app.domain.NumberedSense
 
 // One search result row: heading + reading headline over the
 // compact senses line, as a segmented list item (same idiom as the
@@ -27,15 +27,16 @@ fun ResultRow(
   count: Int,
   heading: String,
   reading: String,
-  kanaOnly: Boolean,
   chain: List<String>,
-  senses: List<SenseDisplay>,
+  rows: List<NumberedSense>,
   highlight: String,
+  matchRange: (String, String) -> IntRange? = RustShaping::matchRange,
   onBadgeTap: (TipTap) -> Unit,
   onOpen: () -> Unit,
 ) {
   val titleSize = MaterialTheme.typography.titleMedium.fontSize
   val bodySize = MaterialTheme.typography.bodyMedium.fontSize
+  val kanaOnly = rows.firstOrNull()?.sense?.uk == true
   val headRead = buildAnnotatedString {
     withStyle(
       SpanStyle(
@@ -73,7 +74,7 @@ fun ResultRow(
           overflow = TextOverflow.Ellipsis,
         )
       }
-      SensesLine(numberedContentSenses(senses), highlight, onBadgeTap = onBadgeTap)
+      SensesLine(rows, highlight, matchRange = matchRange, onBadgeTap = onBadgeTap)
     },
     modifier = Modifier.testTag("resultRow$index"),
   ) {

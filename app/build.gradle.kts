@@ -65,6 +65,18 @@ android {
   }
 }
 
+// Pure-Rust display helpers run over JNA in unit tests: point the
+// JVM at the host cdylib (built by buildHostCdylibs for codegen
+// anyway). Studio previews must not rely on this (they use canned
+// fixtures instead).
+tasks.withType<org.gradle.api.tasks.testing.Test> {
+  // JNA reads jna.library.path at Native init; java.library.path
+  // covers System.loadLibrary fallbacks.
+  val hostLibDir = repoRoot.resolve("target/debug").absolutePath
+  systemProperty("jna.library.path", hostLibDir)
+  systemProperty("java.library.path", hostLibDir)
+}
+
 androidComponents {
     // Generated UniFFI sources, registered per variant (AGP 9 no
     // longer accepts providers in sourceSets). Ordering comes from
@@ -250,6 +262,10 @@ dependencies {
   implementation("androidx.compose.ui:ui-tooling-preview")
   debugImplementation("androidx.compose.ui:ui-tooling")
   testImplementation("junit:junit:4.13.2")
+  // Plain JNA jar for JVM unit tests: the @aar above carries only
+  // Android dispatch .so files, while the jar bundles the host
+  // dispatch (linux-x86-64 etc.) that Native.load needs here.
+  testImplementation("net.java.dev.jna:jna:5.19.1")
   testImplementation("org.robolectric:robolectric:4.17")
   testImplementation("androidx.test:core:1.7.0")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")

@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bakajiten.app.data.KanjiPoint
 import com.bakajiten.app.data.KanjiStroke
-import com.bakajiten.app.domain.liveSlice
+import com.bakajiten.app.data.RustPlayback
 import com.bakajiten.app.theme.BakajitenTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -70,6 +70,7 @@ import kotlin.math.sqrt
 fun StrokePlayer(
   strokes: List<KanjiStroke>,
   modifier: Modifier = Modifier,
+  slice: (List<KanjiPoint>, Float) -> List<KanjiPoint> = RustPlayback::slice,
 ) {
   var done by remember(strokes) { mutableIntStateOf(0) }
   var speed by remember(strokes) { mutableIntStateOf(5) }
@@ -147,7 +148,7 @@ fun StrokePlayer(
         }
       }
       if (!pristine && done < strokes.size) {
-        val live = liveSlice(strokes[done].points, frac.value)
+        val live = slice(strokes[done].points, frac.value)
           .map { Offset(map(it.x), map(it.y)) }
         if (live.size >= 2) {
           val path = Path()
@@ -158,7 +159,7 @@ fun StrokePlayer(
       }
       drawBadges(strokes, done, measurer, ::map)
       if (playing && done < strokes.size) {
-        val tip = liveSlice(strokes[done].points, frac.value).lastOrNull()
+        val tip = slice(strokes[done].points, frac.value).lastOrNull()
         if (tip != null) {
           drawCircle(bright, radius = width * 0.7f, center = Offset(map(tip.x), map(tip.y)))
         }

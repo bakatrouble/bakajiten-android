@@ -95,6 +95,94 @@ class DictionaryManagementTest {
     compose.onNodeWithText("40%").assertExists()
   }
 
+  @Test fun updateAllOffersOutdated() {
+    var updated: List<String>? = null
+    compose.setContent {
+      BakajitenTheme {
+        DictionaryManagementContent(
+          statuses = mapOf(
+            "jmdict.bin" to FileStatus.CURRENT,
+            "kanji.bin" to FileStatus.OUTDATED,
+            "templates.bin" to FileStatus.CURRENT,
+            "jmnedict.bin" to FileStatus.OUTDATED,
+            "kokugo.bin" to FileStatus.MISSING,
+          ),
+          saved = emptyMap(),
+          latest = emptyMap(),
+          savedBytes = emptyMap(),
+          latestBytes = emptyMap(),
+          progress = emptyMap(),
+          error = "",
+          onDownload = {},
+          onDownloadAll = { updated = it },
+          onDelete = {},
+          onDone = {},
+        )
+      }
+    }
+    compose.onNodeWithTag("updateAll").performScrollTo()
+    compose.onNodeWithTag("updateAll").performClick()
+    assertEquals(listOf("kanji.bin", "jmnedict.bin"), updated)
+  }
+
+  @Test fun requiredFilesHaveNoDeleteButton() {
+    compose.setContent {
+      BakajitenTheme {
+        DictionaryManagementContent(
+          statuses = mapOf(
+            "jmdict.bin" to FileStatus.CURRENT,
+            "kanji.bin" to FileStatus.MISSING,
+            "templates.bin" to FileStatus.MISSING,
+            "jmnedict.bin" to FileStatus.CURRENT,
+            "kokugo.bin" to FileStatus.MISSING,
+          ),
+          saved = emptyMap(),
+          latest = emptyMap(),
+          savedBytes = emptyMap(),
+          latestBytes = emptyMap(),
+          progress = emptyMap(),
+          error = "",
+          onDownload = {},
+          onDownloadAll = {},
+          onDelete = {},
+          onDone = {},
+        )
+      }
+    }
+    // Required artifacts never offer individual delete (opt-ins
+    // only); a full reset goes through Clear cached files.
+    compose.onNodeWithTag("delete-jmdict.bin").assertDoesNotExist()
+    compose.onNodeWithTag("delete-jmnedict.bin").assertExists()
+  }
+
+  @Test fun clearCacheConfirmsBeforeClearing() {
+    var cleared = false
+    compose.setContent {
+      BakajitenTheme {
+        DictionaryManagementContent(
+          statuses = mapOf("jmdict.bin" to FileStatus.CURRENT),
+          saved = emptyMap(),
+          latest = emptyMap(),
+          savedBytes = emptyMap(),
+          latestBytes = emptyMap(),
+          progress = emptyMap(),
+          error = "",
+          onDownload = {},
+          onDownloadAll = {},
+          onDelete = {},
+          onClearAll = { cleared = true },
+          onDone = {},
+        )
+      }
+    }
+    compose.onNodeWithTag("clearCache").performScrollTo()
+    compose.onNodeWithTag("clearCache").performClick()
+    compose.onNodeWithTag("confirmClear", useUnmergedTree = true).assertExists()
+    assertEquals(false, cleared)
+    compose.onNodeWithTag("confirmClear").performClick()
+    assertEquals(true, cleared)
+  }
+
   @Test fun localVersionNullWithoutNatives() {
     // No Rust .so on the JVM (and none for this ABI on a fresh
     // device): version reads must degrade to null, never throw —

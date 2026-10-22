@@ -2,8 +2,10 @@ package com.bakajiten.app.data
 
 // In-memory backend for JVM unit tests, headless e2e, previews,
 // and dev runs without packed data. Toy records mirror the web
-// backend tests: たべる/食べる (vt "to eat"), あの人 (arch sense),
-// and a kana-only entry.
+// backend tests: たべる/食べる (v1 "to eat"), あの人 (arch sense),
+// and a kana-only entry. Tag indices are REAL table indices
+// (v1=31, arch=1, uk=47) so the Rust shaper resolves them exactly
+// like packed data — the fake owns no label tables anymore.
 
 private fun sense(
   pos: List<Int> = emptyList(),
@@ -22,17 +24,12 @@ private fun sense(
   sources = emptyList(),
 )
 
-val FAKE_POS_LABELS = mapOf(0 to "&vt;", 1 to "&v5r-i;", 2 to "&vi;")
-val FAKE_POS_TIPS = mapOf(0 to "transitive verb", 1 to "Godan verb with 'ru' ending", 2 to "intransitive verb")
-val FAKE_MISC_LABELS = mapOf(0 to "&arch;", 1 to "&uk;")
-val FAKE_MISC_TIPS = mapOf(0 to "archaic", 1 to "word usually written using kana alone")
-
 private fun taberuEntry() = DictEntry(
   heading = "食べる",
   reading = "たべる",
   senses = listOf(
-    sense(pos = listOf(0), gloss = "to eat"),
-    sense(pos = listOf(0), gloss = "to live on"),
+    sense(pos = listOf(31), gloss = "to eat"),
+    sense(pos = listOf(31), gloss = "to live on"),
   ),
   kanji = listOf(DictKanjiElement("食べる", emptyList(), listOf("ichi1"))),
   readings = listOf(DictReadingElement("たべる", false, emptyList(), emptyList(), listOf("ichi1"))),
@@ -46,7 +43,7 @@ private fun anoHitoEntry() = DictEntry(
   reading = "あのひと",
   senses = listOf(
     sense(gloss = "he"),
-    sense(misc = listOf(0), gloss = "you"),
+    sense(misc = listOf(1), gloss = "you"),
   ),
   kanji = emptyList(),
   readings = listOf(DictReadingElement("あのひと", false, emptyList(), emptyList(), emptyList())),
@@ -58,7 +55,7 @@ private fun anoHitoEntry() = DictEntry(
 private fun areEntry() = DictEntry(
   heading = "あれ",
   reading = "あれ",
-  senses = listOf(sense(misc = listOf(1), gloss = "that (far from speaker and listener)")),
+  senses = listOf(sense(misc = listOf(47), gloss = "that (far from speaker and listener)")),
   kanji = emptyList(),
   readings = listOf(DictReadingElement("あれ", true, emptyList(), emptyList(), emptyList())),
   isName = false,
@@ -71,11 +68,6 @@ class FakeDictionaryBackend : DictionaryBackend {
 
   private fun keys(e: DictEntry): List<String> =
     listOf(e.heading, e.reading) + e.kanji.map { it.keb } + e.readings.map { it.reb }
-
-  fun posLabel(i: Int): String = FAKE_POS_LABELS[i] ?: ""
-  fun posTip(i: Int): String = FAKE_POS_TIPS[i] ?: ""
-  fun miscLabel(i: Int): String = FAKE_MISC_LABELS[i] ?: ""
-  fun miscTip(i: Int): String = FAKE_MISC_TIPS[i] ?: ""
 
   override fun searchIndices(query: String, mode: SearchMode, cap: Int): List<SearchHit> {
     if (query == "" || cap == 0) return emptyList()

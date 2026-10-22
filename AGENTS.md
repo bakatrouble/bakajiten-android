@@ -18,25 +18,40 @@ two-pane with the article beside the results.
   - `state/AppViewModel.kt` — search state (200 ms debounce,
     affix-toggles → SearchMode, meaning mode), screen nav.
   - `data/Backend.kt` — backend contract (records mirror the
-    UniFFI records 1:1).  - `data/RustBackend.kt` — UniFFI/JNA implementation + label
-    tables; `data/FakeBackend.kt` — toy data for JVM tests,
-    headless e2e, previews, and no-data dev.
+    UniFFI records 1:1).
+  - `data/RustBackend.kt` — UniFFI/JNA implementation; `data/RustShaping.kt`
+    — UniFFI display shaping + kana→romaji display (free functions,
+    no artifacts needed — unit tests point the JVM at the host cdylib
+    via `jna.library.path`, see `app/build.gradle.kts`); `data/CannedShaping.kt` — hand-written
+    expected shaped output for the three toy entries, previews
+    only (not logic); `data/FakeBackend.kt` — toy data for JVM tests,
+    headless e2e, previews, and no-data dev (real table indices, no
+    label maps).
   - `data/DataManager.kt` — consent-gated `.bin.gz` downloads
     (streamed to disk, size + sha256 verify, atomic install),
     mirroring web `Backend.ts`; saved versions read from the
     artifacts themselves via UniFFI (`gloss_version`,
-    `kanji_versions`, `templates_packed_at`). Nothing downloads
+    `kanji_version`, `templates_packed_at`). Nothing downloads
     without a tap.
   - `data/SettingsRepository.kt` — DataStore prefs + in-memory
     fake. `searchBarPosition` (TOP/BOTTOM) is the Android-only
     addition: the search bar docks top or bottom per settings.
-  - `domain/Kana.kt` — pure-Kotlin port of the romaji→kana edge
-    (row-for-row with `lib/libdict/src/kana/`).
-  - `domain/Romaji.kt` — pure-Kotlin port of kana→romaji display
-    (`lib/libdict/src/romaji.rs` traces); drives the reading
-    display setting with no JNA in the UI.
-  - `domain/Labels.kt` — sense display shaping (badges, tips,
-    numbering, heading preference), mirroring web `labels.ts`.
+  - `domain/Kana.kt` — deleted (was a romaji→kana port); conversion
+    lives in Rust (`lib/libdict/src/kana/`) behind `data/RustKana`,
+    wired through `Backends.romajiToKana` (query edge) and an
+    injectable display fn on `KanaFieldState` (previews pass canned
+    text). Field mechanics (`applyKanaEdit`, cursor handling) stay
+    in `ui/components/KanaField.kt` — spec, not engine.
+  - `domain/Labels.kt` — sense UI models (`SenseDisplay`,
+    `NumberedSense`, `TagKind`) + the trivially pure helpers
+    (`isKanaEntry`); shaping itself lives in Rust
+    (`lib/libdict/src/gloss/display.rs`), as do kana→romaji
+    (`lib/libdict/src/romaji.rs`), the kana edge (`lib/libdict/src/kana/`),
+    kanji display (`lib/libdict/src/kanji/display.rs`), and stroke
+    interpolation (`librecognizer` geometry). All cross the boundary
+    through the `Backends` bundle or injectable fn params (JNA
+    defaults; canned fixtures for previews, which cannot load the
+    host cdylib). `domain/` holds no engine ports anymore.
   - `ui/` — `SearchScreen` (search bar top/bottom per settings;
     the opaque recognizer panel overlays the list and the matches
     count, never squeezes them; while it is open the field keeps
@@ -49,8 +64,9 @@ two-pane with the article beside the results.
     shapes over `surfaceContainer`, gaps instead of dividers; shapes
     need only the position and `hits.size`, so entries resolve
     lazily per visible row — never map the whole (uncapped) hit
-    list up front, each `entryAt` crosses JNA on the main thread;
-    row content lives in
+    list up front; each `entryAt` crosses JNA on the main thread,
+    as does shaping (`backends.displaySenses` per visible row —
+    the free functions need no artifacts). Row content lives in
     `ui/components/ResultRow.kt`, and tapping a tag in the compact
     senses line reports its tip plus the window tap point through
     `onBadgeTap` — the list shows it in its one shared tooltip,

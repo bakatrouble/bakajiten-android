@@ -178,7 +178,6 @@ class RecognizerPanelTest {
     val fake = FakeDictionaryBackend()
     val be = Backends(
       fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-      fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
     )
     compose.setContent {
       BakajitenTheme {

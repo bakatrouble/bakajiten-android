@@ -3,16 +3,18 @@ package com.bakajiten.app.state
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bakajiten.app.data.AppSettings
+import com.bakajiten.app.data.DictEntry
 import com.bakajiten.app.data.DictionaryBackend
 import com.bakajiten.app.data.KanjiBackend
+import com.bakajiten.app.data.KanjiEntry
 import com.bakajiten.app.data.RecognizerBackend
 import com.bakajiten.app.data.FuriganaBackend
+import com.bakajiten.app.data.RustKana
+import com.bakajiten.app.data.RustShaping
 import com.bakajiten.app.data.SearchHit
 import com.bakajiten.app.data.SearchMode
 import com.bakajiten.app.data.SettingsRepository
-import com.bakajiten.app.domain.SenseDisplay
-import com.bakajiten.app.domain.displaySenses
-import com.bakajiten.app.domain.romajiToKana
+import com.bakajiten.app.domain.NumberedSense
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,21 +52,27 @@ data class UiState(
 )
 
 /**
- * Backend bundle. Label/furigana functions come from the same
- * source as the dictionaries (fake tables in tests, UniFFI in
- * production), so display shaping never drifts from data.
+ * Backend bundle. Display shaping runs in Rust (pure UniFFI free
+ * functions — no artifacts needed, but the native library must
+ * load); the function fields default to it so tests exercise the
+ * real shaping, while previews pass canned fixtures (Studio cannot
+ * load the host cdylib). Fake search backends stay dumb data.
  */
 class Backends(
   val dict: DictionaryBackend,
   val kanji: KanjiBackend,
   val recognizer: RecognizerBackend,
   val furigana: FuriganaBackend,
-  val posLabel: (Int) -> String,
-  val posTip: (Int) -> String,
-  val fieldLabel: (Int) -> String,
-  val fieldTip: (Int) -> String,
-  val miscLabel: (Int) -> String,
-  val miscTip: (Int) -> String,
+  val displaySenses: (DictEntry) -> List<NumberedSense> = RustShaping::displaySenses,
+  val matchRange: (String, String) -> IntRange? = RustShaping::matchRange,
+  val preferKeb: (DictEntry, String) -> String = RustShaping::preferKeb,
+  val preferReb: (DictEntry, String) -> String = RustShaping::preferReb,
+  val queryFor: (String) -> String = RustShaping::queryFor,
+  val isCommonWord: (DictEntry) -> Boolean = RustShaping::isCommonWord,
+  val displayReading: (String, Boolean, Boolean) -> String = RustShaping::displayReading,
+  val romajiToKana: (String) -> String = RustKana::convert,
+  val radicalGlyph: (Int) -> String = RustShaping::radicalGlyph,
+  val kanjiDetails: (KanjiEntry) -> List<uniffi.dict.KanjiDetailRow> = RustShaping::kanjiDetails,
 )
 
 class AppViewModel(
@@ -92,7 +100,7 @@ class AppViewModel(
   fun onQuery(raw: String) {
     // Romaji converts at the query edge (always hiragana out),
     // except in meaning mode where English goes through raw.
-    val q = if (_settings.value.meaning) raw else romajiToKana(raw)
+    val q = if (_settings.value.meaning) raw else backends.romajiToKana(raw)
     _ui.update { it.copy(query = raw) }
     searchJob?.cancel()
     searchJob = viewModelScope.launch {
@@ -120,17 +128,6 @@ class AppViewModel(
     return true
   }
 
-  fun sensesAt(index: Int): List<SenseDisplay> {
-    val hit = _ui.value.hits.getOrNull(index) ?: return emptyList()
-    val entry = backends.dict.entryAt(hit.idx) ?: return emptyList()
-    return displaySenses(
-      entry,
-      backends.posLabel, backends.posTip,
-      backends.fieldLabel, backends.fieldTip,
-      backends.miscLabel, backends.miscTip,
-    )
-  }
-
   fun updateSettings(transform: (AppSettings) -> AppSettings) {
     viewModelScope.launch { settingsRepo.update(transform) }
   }
@@ -138,7 +135,7 @@ class AppViewModel(
   private fun runSearch(converted: String? = null) {
     val s = _settings.value
     val raw = _ui.value.query
-    val q = converted ?: if (s.meaning) raw else romajiToKana(raw)
+    val q = converted ?: if (s.meaning) raw else backends.romajiToKana(raw)
     if (!_ui.value.ready) return
     if (q == "") {
       _ui.update { it.copy(hits = emptyList(), status = "") }

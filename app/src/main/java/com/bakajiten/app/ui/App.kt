@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.bakajiten.app.data.cannedBackends
 import com.bakajiten.app.data.Candidate
 import com.bakajiten.app.data.DataManager
 import com.bakajiten.app.data.FakeDictionaryBackend
@@ -269,10 +270,7 @@ private fun ArticleRoute(vm: AppViewModel, backends: Backends, index: Int) {
 @Composable
 private fun BakajitenAppPreview() {
   val fake = FakeDictionaryBackend()
-  val backends = Backends(
-    fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-    fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
-  )
+  val backends = cannedBackends(fake)
   val vm = AppViewModel(InMemorySettingsRepository(), backends)
   BakajitenApp(vm = vm, backends = backends, widthClass = AdaptiveWidth.COMPACT)
 }

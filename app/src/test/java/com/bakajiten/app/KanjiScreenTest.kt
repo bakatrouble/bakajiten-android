@@ -9,7 +9,6 @@ import com.bakajiten.app.data.FakeDictionaryBackend
 import com.bakajiten.app.data.FakeFuriganaBackend
 import com.bakajiten.app.data.FakeKanjiBackend
 import com.bakajiten.app.data.FakeRecognizerBackend
-import com.bakajiten.app.domain.kanjiRadicalGlyph
 import com.bakajiten.app.state.Backends
 import com.bakajiten.app.theme.BakajitenTheme
 import com.bakajiten.app.ui.KanjiScreen
@@ -32,7 +31,6 @@ class KanjiScreenTest {
     val fake = FakeDictionaryBackend()
     return Backends(
       fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-      fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
     )
   }
 
@@ -57,7 +55,7 @@ class KanjiScreenTest {
     show()
     compose.onNodeWithText("Kanji information", substring = true).assertExists()
     compose.onNodeWithText("Stroke count: 4", substring = true).assertExists()
-    compose.onNodeWithText("Radical: 72 ${kanjiRadicalGlyph(72)}", substring = true).assertExists()
+    compose.onNodeWithText("Radical: 72 ${backends().radicalGlyph(72)}", substring = true).assertExists()
   }
 
   @Test fun infoTabShowsTableAndPlayer() {

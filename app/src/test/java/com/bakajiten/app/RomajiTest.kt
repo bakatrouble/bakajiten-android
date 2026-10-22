@@ -1,17 +1,31 @@
 package com.bakajiten.app
 
-import com.bakajiten.app.domain.kanaToRomaji
+import com.bakajiten.app.data.FakeDictionaryBackend
+import com.bakajiten.app.data.FakeFuriganaBackend
+import com.bakajiten.app.data.FakeKanjiBackend
+import com.bakajiten.app.data.FakeRecognizerBackend
+import com.bakajiten.app.state.Backends
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// Port of lib/libdict romaji acceptance traces: reading display
-// must romanize exactly like the Rust engine.
+// Reading display through the real Rust engine (Backends defaults
+// load the host cdylib). Mirrors the lib/libdict romaji acceptance
+// traces: Hepburn macrons, Kunrei circumflexes, geminates, ん
+// rules, digraphs, katakana folding, verb endings staying split.
 
 class RomajiTest {
-  private fun hepburn(s: String) = kanaToRomaji(s, true)
-  private fun kunrei(s: String) = kanaToRomaji(s, false)
+  private val backends = Backends(
+    FakeDictionaryBackend(),
+    FakeKanjiBackend(),
+    FakeRecognizerBackend(),
+    FakeFuriganaBackend(),
+  )
+
+  private fun hepburn(s: String) = backends.displayReading(s, true, true)
+  private fun kunrei(s: String) = backends.displayReading(s, true, false)
 
   @Test fun convertsBothSchools() {
+    assertEquals("たべる", backends.displayReading("たべる", false, true))
     assertEquals("taberu", hepburn("たべる"))
     assertEquals("sushi", hepburn("すし"))
     assertEquals("chizu", hepburn("ちず"))

@@ -142,17 +142,10 @@ class RustRecognizerBackend private constructor(private val native: NativeRecogn
     ).map { Candidate(it.character, it.distance.toLong(), it.isKana) }
 }
 
-/** Entity/description label tables from the Rust side (tooltips). */
+/** UniFFI free functions with no backend handle (label tables,
+ * furigana). Display shaping lives in RustShaping; this keeps only
+ * what has no shaped counterpart. */
 object RustLabels {
-  fun posLabel(i: Int): String = uniffi.dict.posLabel(i.toUByte())
-  fun posTip(i: Int): String = uniffi.dict.posDescription(i.toUByte())
-  fun nameTypeLabel(i: Int): String = uniffi.dict.nameTypeLabel(i.toUByte())
-  fun nameTypeTip(i: Int): String = uniffi.dict.nameTypeDescription(i.toUByte())
-  fun fieldLabel(i: Int): String = uniffi.dict.fieldLabel(i.toUByte())
-  fun fieldTip(i: Int): String = uniffi.dict.fieldDescription(i.toUByte())
-  fun miscLabel(i: Int): String = uniffi.dict.miscLabel(i.toUByte())
-  fun miscTip(i: Int): String = uniffi.dict.miscDescription(i.toUByte())
-
   fun furigana(head: String, reading: String): List<FuriganaSpan>? =
     uniffi.dict.furiganaSegment(head, reading)?.map { FuriganaSpan(it.text, it.ruby) }
 }

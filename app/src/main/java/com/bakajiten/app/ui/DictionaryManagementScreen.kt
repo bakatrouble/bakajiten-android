@@ -119,6 +119,18 @@ fun DictionaryManagementScreen(manager: DataManager, onDone: () -> Unit, modifie
     }
   }
 
+  fun clearAll() {
+    error = ""
+    scope.launch {
+      val names = REQUIRED_FILES + OPTIONAL_FILES
+      val failures = names.filter { runCatching { manager.delete(it) }.isFailure }
+      if (failures.isNotEmpty()) {
+        error = "could not remove ${failures.joinToString(", ")}"
+      }
+      updateStatuses()
+    }
+  }
+
   androidx.compose.runtime.LaunchedEffect(Unit) { refresh() }
 
   DictionaryManagementContent(
@@ -127,11 +139,13 @@ fun DictionaryManagementScreen(manager: DataManager, onDone: () -> Unit, modifie
     latest = manifest.mapValues { it.value.version },
     savedBytes = savedBytes,
     latestBytes = manifest.mapValues { it.value.size },
+    latestGz = manifest.mapValues { it.value.gz },
     progress = progress,
     error = error,
     onDownload = ::download,
     onDownloadAll = ::downloadAll,
     onDelete = ::remove,
+    onClearAll = ::clearAll,
     onDone = onDone,
     modifier = modifier,
   )
@@ -145,11 +159,13 @@ internal fun DictionaryManagementContent(
   latest: Map<String, String?>,
   savedBytes: Map<String, Long?>,
   latestBytes: Map<String, Long>,
+  latestGz: Map<String, Long> = emptyMap(),
   progress: Map<String, Float>,
   error: String,
   onDownload: (String) -> Unit,
   onDownloadAll: (List<String>) -> Unit,
   onDelete: (String) -> Unit,
+  onClearAll: () -> Unit = {},
   onDone: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -158,6 +174,7 @@ internal fun DictionaryManagementContent(
   )
   // Trash taps arm a confirmation dialog; only Remove deletes.
   var confirm by remember { mutableStateOf<String?>(null) }
+  var confirmClear by remember { mutableStateOf(false) }
   val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
   Scaffold(
     topBar = {
@@ -194,6 +211,7 @@ internal fun DictionaryManagementContent(
         latest = latest,
         savedBytes = savedBytes,
         latestBytes = latestBytes,
+        latestGz = latestGz,
         progress = progress,
         colors = colors,
         onDownload = onDownload,
@@ -207,6 +225,7 @@ internal fun DictionaryManagementContent(
         latest = latest,
         savedBytes = savedBytes,
         latestBytes = latestBytes,
+        latestGz = latestGz,
         progress = progress,
         colors = colors,
         onDownload = onDownload,
@@ -222,16 +241,65 @@ internal fun DictionaryManagementContent(
       // Without the required trio there is nothing to continue to:
       // offer a single tap that fetches every missing required file.
       val missingRequired = REQUIRED_FILES.filter { statuses[it] == FileStatus.MISSING }
+      // Stale files (required or opt-in) refresh with one tap.
+      val outdated = (REQUIRED_FILES + OPTIONAL_FILES).filter { statuses[it] == FileStatus.OUTDATED }
+      val requiredTotal = missingRequired.map { latestGz[it] ?: -1 }
+        .takeIf { totals -> totals.all { it >= 0 } }?.sum()
+      val updateTotal = outdated.map { latestGz[it] ?: -1 }
+        .takeIf { totals -> totals.all { it >= 0 } }?.sum()
       if (missingRequired.isEmpty()) {
-        Button(onClick = onDone, modifier = Modifier.testTag("dictionariesDone")) { Text("Continue") }
+        androidx.compose.foundation.layout.Row(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          Button(onClick = onDone, modifier = Modifier.testTag("dictionariesDone")) { Text("Continue") }
+          if (outdated.isNotEmpty()) {
+            val updateLabel =
+              if (updateTotal != null) "Update all (${formatBytes(updateTotal)})" else "Update all"
+            Button(
+              onClick = { onDownloadAll(outdated) },
+              enabled = progress.isEmpty(),
+              modifier = Modifier.testTag("updateAll"),
+            ) { Text(updateLabel) }
+          }
+        }
       } else {
+        val requiredLabel =
+          if (requiredTotal != null) "Download required (${formatBytes(requiredTotal)})" else "Download required"
         Button(
           onClick = { onDownloadAll(missingRequired) },
           enabled = progress.isEmpty(),
           modifier = Modifier.testTag("downloadRequired"),
-        ) { Text("Download required") }
+        ) { Text(requiredLabel) }
       }
+      // Full reset (opt-ins and required alike; missing required
+      // files re-offer download above).
+      TextButton(
+        onClick = { confirmClear = true },
+        enabled = progress.isEmpty(),
+        modifier = Modifier.testTag("clearCache"),
+      ) { Text("Clear cached files") }
     }
+  }
+  if (confirmClear) {
+    AlertDialog(
+      onDismissRequest = { confirmClear = false },
+      title = { Text("Clear all downloaded files?") },
+      text = {
+        Text("Required files download again on request.")
+      },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onClearAll()
+            confirmClear = false
+          },
+          modifier = Modifier.testTag("confirmClear"),
+        ) { Text("Clear") }
+      },
+      dismissButton = {
+        TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
+      },
+    )
   }
   confirm?.let { name ->
     AlertDialog(
@@ -272,6 +340,7 @@ private fun DictionaryGroup(
   latest: Map<String, String?>,
   savedBytes: Map<String, Long?>,
   latestBytes: Map<String, Long>,
+  latestGz: Map<String, Long>,
   progress: Map<String, Float>,
   colors: androidx.compose.material3.ListItemColors,
   onDownload: (String) -> Unit,
@@ -339,27 +408,34 @@ private fun DictionaryGroup(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             val downloading = name in progress
+            // Wire size on the button, unpacked sizes on the Saved /
+            // Latest lines below (mirrors the web manager).
+            val wire = latestGz[name]?.let(::formatBytes)
             when (st) {
               FileStatus.MISSING -> Button(
                 onClick = { onDownload(name) },
                 enabled = !downloading,
                 modifier = Modifier.testTag("download-$name"),
-              ) { Text("Download") }
+              ) { Text(if (wire != null) "Download $wire" else "Download") }
               FileStatus.OUTDATED -> Button(
                 onClick = { onDownload(name) },
                 enabled = !downloading,
                 modifier = Modifier.testTag("download-$name"),
-              ) { Text("Update") }
-              FileStatus.CURRENT -> Text(
-                "Up to date",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.tertiary,
-              )
+              ) { Text(if (wire != null) "Update $wire" else "Update") }
+              FileStatus.CURRENT -> Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.testTag("uptodate-$name"),
+              ) { Text("Up to date") }
               null -> Unit
             }
-            // Present files (stale or current) can be removed; the
-            // row then falls back to Download / Download required.
-            if (st == FileStatus.CURRENT || st == FileStatus.OUTDATED) {
+            // Present opt-in files can be removed; required ones
+            // have no delete button at all (use Clear cached files
+            // below for a full reset). The row then falls back to
+            // Download / Download required.
+            val removable = (st == FileStatus.CURRENT || st == FileStatus.OUTDATED) &&
+              !REQUIRED_FILES.contains(name)
+            if (removable) {
               IconButton(
                 onClick = { onDelete(name) },
                 enabled = !downloading,

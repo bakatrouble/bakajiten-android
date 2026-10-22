@@ -32,6 +32,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.bakajiten.app.data.cannedBackends
 import com.bakajiten.app.data.FakeDictionaryBackend
 import com.bakajiten.app.data.FakeFuriganaBackend
 import com.bakajiten.app.data.FakeKanjiBackend
@@ -39,7 +40,6 @@ import com.bakajiten.app.data.FakeRecognizerBackend
 import com.bakajiten.app.data.RomajiStyle
 import com.bakajiten.app.data.SearchMode
 import com.bakajiten.app.data.StrokePoint
-import com.bakajiten.app.domain.kanjiRadicalGlyph
 import com.bakajiten.app.state.Backends
 import com.bakajiten.app.theme.BakajitenTheme
 import com.bakajiten.app.ui.components.KanjiInfoTable
@@ -83,7 +83,7 @@ fun KanjiScreen(
   // subtitle. Bare character title when there is no entry.
   val radicalNumber = entry?.radical?.takeIf { it > 0 }
   val radical = if (radicalNumber != null) {
-    "$radicalNumber ${kanjiRadicalGlyph(radicalNumber)}"
+    "$radicalNumber ${backends.radicalGlyph(radicalNumber)}"
   } else {
     "-"
   }
@@ -146,7 +146,7 @@ fun KanjiScreen(
                                 Text("No data for this character")
                             } else {
                                 if (strokes.isNotEmpty()) StrokePlayer(strokes)
-                                KanjiInfoTable(entry)
+                                KanjiInfoTable(backends.kanjiDetails(entry))
                             }
                         }
                     }
@@ -188,10 +188,7 @@ fun KanjiScreen(
 @Composable
 private fun KanjiScreenPreview() {
   val fake = FakeDictionaryBackend()
-  val backends = Backends(
-    fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-    fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
-  )
+  val backends = cannedBackends(fake)
   BakajitenTheme {
     KanjiScreen(character = "日", backends = backends, onSearch = {}, onBack = {})
   }

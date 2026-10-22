@@ -39,7 +39,6 @@ class ResultsListPressTest {
     val fake = FakeDictionaryBackend()
     val backends = Backends(
       fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-      fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
     )
     compose.setContent {
       BakajitenTheme {
@@ -80,7 +79,7 @@ class ResultsListPressTest {
   }
 
   // Badge taps retarget the one list-level tooltip (no per-row
-  // popups): tapping "vt" surfaces its description as a tooltip.
+  // popups): tapping "v1" surfaces its description as a tooltip.
   @Test fun badgeTapShowsSharedTooltip() {
     show(onBackgroundTap = {}, panelOpen = false)
     // Unmerged tree: the row merges headline + senses into one
@@ -90,13 +89,13 @@ class ResultsListPressTest {
     senses.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult]
       ?.action?.invoke(layouts)
     val layout = layouts.firstOrNull() ?: error("no text layout")
-    val at = layout.layoutInput.text.indexOf("vt").takeIf { it >= 0 } ?: error("badge missing")
+    val at = layout.layoutInput.text.indexOf("v1").takeIf { it >= 0 } ?: error("badge missing")
     val box = layout.getBoundingBox(at + 1)
     senses.performTouchInput {
       down(0, box.center)
       up(0)
     }
     compose.waitForIdle()
-    compose.onNodeWithText("transitive verb").assertIsDisplayed()
+    compose.onNodeWithText("Ichidan verb").assertIsDisplayed()
   }
 }

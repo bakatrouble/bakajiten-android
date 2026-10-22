@@ -1,18 +1,33 @@
 package com.bakajiten.app
 
-import com.bakajiten.app.domain.applyKanaEdit
-import com.bakajiten.app.domain.romajiDisplay
-import com.bakajiten.app.domain.romajiHasPendingTail
-import com.bakajiten.app.domain.romajiToKana
+import com.bakajiten.app.data.FakeDictionaryBackend
+import com.bakajiten.app.data.FakeFuriganaBackend
+import com.bakajiten.app.data.FakeKanjiBackend
+import com.bakajiten.app.data.FakeRecognizerBackend
+import com.bakajiten.app.data.RustKana
+import com.bakajiten.app.state.Backends
+import com.bakajiten.app.ui.components.applyKanaEdit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Port of lib/libdict kana acceptance traces: the Android query
-// edge must convert exactly like the Rust engine.
+// Romaji→kana query edge through the real Rust engine (Backends
+// defaults load the host cdylib). Mirrors the lib/libdict kana
+// acceptance traces.
 
 class KanaTest {
+  private val backends = Backends(
+    FakeDictionaryBackend(),
+    FakeKanjiBackend(),
+    FakeRecognizerBackend(),
+    FakeFuriganaBackend(),
+  )
+  private val convert = backends.romajiToKana
+  private val display = RustKana::display
+  private val pending = RustKana::hasPending
+  private fun edit(raw: String, new: String) = applyKanaEdit(raw, new, RustKana::display)
+
   @Test fun batchAcceptance() {
     val rows = listOf(
       "a" to "あ", "shi" to "し", "chi" to "ち", "tsu" to "つ",
@@ -41,7 +56,7 @@ class KanaTest {
       "'" to "'",
     )
     for ((input, expected) in rows) {
-      assertEquals("batch $input", expected, romajiToKana(input))
+      assertEquals("batch $input", expected, convert(input))
     }
   }
 
@@ -62,40 +77,40 @@ class KanaTest {
       "xtsu" to "っ", "n'" to "ん", "q" to "q",
     )
     for ((raw, expected) in rows) {
-      assertEquals("display $raw", expected, romajiDisplay(raw))
+      assertEquals("display $raw", expected, display(raw))
     }
   }
 
   @Test fun pendingTailTraces() {
-    assertTrue(romajiHasPendingTail("n"))
-    assertTrue(romajiHasPendingTail("shin"))
-    assertTrue(romajiHasPendingTail("sh"))
-    assertTrue(romajiHasPendingTail("t"))
-    assertTrue(romajiHasPendingTail("たn"))
-    assertFalse(romajiHasPendingTail(""))
-    assertFalse(romajiHasPendingTail("ta"))
-    assertFalse(romajiHasPendingTail("shi"))
-    assertFalse(romajiHasPendingTail("たべる"))
-    assertFalse(romajiHasPendingTail("食べる"))
+    assertTrue(pending("n"))
+    assertTrue(pending("shin"))
+    assertTrue(pending("sh"))
+    assertTrue(pending("t"))
+    assertTrue(pending("たn"))
+    assertFalse(pending(""))
+    assertFalse(pending("ta"))
+    assertFalse(pending("shi"))
+    assertFalse(pending("たべる"))
+    assertFalse(pending("食べる"))
   }
 
   @Test fun fieldEditTraces() {
     // Typing: literal suffixes accumulate in the raw buffer while
     // the display converts (pending tails stay raw).
-    assertEquals("t", applyKanaEdit("", "t"))
-    assertEquals("ta", applyKanaEdit("t", "ta"))
-    assertEquals("taberu", applyKanaEdit("", "taberu"))
-    assertEquals("shin", applyKanaEdit("shi", "しn"))
-    assertEquals("shinn", applyKanaEdit("shin", "しnn"))
-    assertEquals("あ", applyKanaEdit("", "あ"))
+    assertEquals("t", edit("", "t"))
+    assertEquals("ta", edit("t", "ta"))
+    assertEquals("taberu", edit("", "taberu"))
+    assertEquals("shin", edit("shi", "しn"))
+    assertEquals("shinn", edit("shin", "しnn"))
+    assertEquals("あ", edit("", "あ"))
     // End-backspace deletes one whole display character, walking
     // raw back without un-converting stepwise.
-    assertEquals("", applyKanaEdit("ta", ""))
-    assertEquals("shi", applyKanaEdit("shin", "し"))
-    assertEquals("shin", applyKanaEdit("shinn", "しん"))
-    assertEquals("shi", applyKanaEdit("shin'", "し"))
+    assertEquals("", edit("ta", ""))
+    assertEquals("shi", edit("shin", "し"))
+    assertEquals("shin", edit("shinn", "しん"))
+    assertEquals("shi", edit("shin'", "し"))
     // Anything else resets to the literal text.
-    assertEquals("たえる", applyKanaEdit("taberu", "たえる"))
-    assertEquals("taberu!", applyKanaEdit("taberu", "たべる!"))
+    assertEquals("たえる", edit("taberu", "たえる"))
+    assertEquals("taberu!", edit("taberu", "たべる!"))
   }
 }

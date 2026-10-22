@@ -27,14 +27,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.bakajiten.app.data.cannedBackends
 import com.bakajiten.app.data.RomajiStyle
 import com.bakajiten.app.data.SearchHit
-import com.bakajiten.app.domain.SenseDisplay
-import com.bakajiten.app.domain.displaySenses
-import com.bakajiten.app.domain.displayReading
-import com.bakajiten.app.domain.isKanaEntry
-import com.bakajiten.app.domain.preferKeb
-import com.bakajiten.app.domain.preferReb
 import com.bakajiten.app.state.Backends
 import com.bakajiten.app.ui.components.ResultRow
 import com.bakajiten.app.ui.components.TipTap
@@ -109,25 +104,19 @@ fun ResultsList(
       // straight from search, so this is not expected to happen —
       // and the shapes below assume dense positions.
       val entry = backends.dict.entryAt(hit.idx) ?: return@itemsIndexed
-      val senses = displaySenses(
-        entry,
-        backends.posLabel, backends.posTip,
-        backends.fieldLabel, backends.fieldTip,
-        backends.miscLabel, backends.miscTip,
-      )
       ResultRow(
         index = i,
         count = hits.size,
-        heading = preferKeb(entry, hit.matched.ifEmpty { query }),
-        reading = displayReading(
-          preferReb(entry, hit.matched.ifEmpty { query }),
-          romanize = romaji != RomajiStyle.KANA,
-          hepburn = romaji == RomajiStyle.HEPBURN,
+        heading = backends.preferKeb(entry, hit.matched.ifEmpty { query }),
+        reading = backends.displayReading(
+          backends.preferReb(entry, hit.matched.ifEmpty { query }),
+          romaji != RomajiStyle.KANA,
+          romaji == RomajiStyle.HEPBURN,
         ),
-        kanaOnly = isKanaEntry(senses),
         chain = hit.chain,
-        senses = senses,
+        rows = backends.displaySenses(entry),
         highlight = if (meaning) hit.matched.ifEmpty { query } else "",
+        matchRange = backends.matchRange,
         onBadgeTap = { tap ->
           tipTap = tap
           scope.launch { tooltipState.show() }
@@ -150,13 +139,7 @@ fun ResultsList(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 private fun ResultsListPreview() {
   val fake = com.bakajiten.app.data.FakeDictionaryBackend()
-  val backends = com.bakajiten.app.state.Backends(
-    fake,
-    com.bakajiten.app.data.FakeKanjiBackend(),
-    com.bakajiten.app.data.FakeRecognizerBackend(),
-    com.bakajiten.app.data.FakeFuriganaBackend(),
-    fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
-  )
+  val backends = cannedBackends(fake)
   com.bakajiten.app.theme.BakajitenTheme {
     ResultsList(
       hits = fake.searchIndices("た", com.bakajiten.app.data.SearchMode.PREFIX, 50),

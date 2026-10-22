@@ -35,9 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.bakajiten.app.data.RustShaping
 import com.bakajiten.app.domain.NumberedSense
 import com.bakajiten.app.domain.TagKind
-import com.bakajiten.app.domain.matchRange
 import kotlinx.coroutines.launch
 
 // One sense row: number, tags, and glosses in a single Text, so
@@ -54,6 +54,7 @@ fun SenseRow(
   row: NumberedSense,
   highlight: String,
   modifier: Modifier = Modifier,
+  matchRange: (String, String) -> IntRange? = RustShaping::matchRange,
 ) {
   // One tooltip per row, anchored to the row itself: the article is
   // a plain Column (never recycled), so no per-badge popup nodes
@@ -77,6 +78,7 @@ fun SenseRow(
           // Full width like the list line: hit-testing maps taps
           // against the laid-out line, not an intrinsic sliver.
           modifier = Modifier.fillMaxWidth(),
+          matchRange = matchRange,
           onBadgeTap = { tap ->
             tipTap = tap
             scope.launch { tipState.show() }
@@ -116,6 +118,7 @@ fun SensesLine(
   rows: List<NumberedSense>,
   highlight: String,
   modifier: Modifier = Modifier,
+  matchRange: (String, String) -> IntRange? = RustShaping::matchRange,
   onBadgeTap: (TipTap) -> Unit = {},
 ) {
   SenseText(
@@ -124,6 +127,7 @@ fun SensesLine(
     maxLines = 1,
     overflow = TextOverflow.Ellipsis,
     modifier = modifier,
+    matchRange = matchRange,
     onBadgeTap = onBadgeTap,
   )
 }
@@ -190,6 +194,7 @@ private fun SenseText(
   maxLines: Int,
   overflow: TextOverflow,
   modifier: Modifier = Modifier,
+  matchRange: (String, String) -> IntRange? = RustShaping::matchRange,
   onBadgeTap: (TipTap) -> Unit = {},
 ) {
   val pos = MaterialTheme.colorScheme.tertiary
@@ -222,7 +227,8 @@ private fun SenseText(
         append(" ")
       }
       val gloss = row.sense.glosses.joinToString("; ")
-      val range = matchRange(gloss, highlight)
+      // Empty queries never highlight (and skip the FFI round-trip).
+      val range = if (highlight.isEmpty()) null else matchRange(gloss, highlight)
       if (range == null) {
         append(gloss)
       } else {
@@ -314,6 +320,13 @@ private fun SenseRowPreview() {
         1,
       ),
       highlight = "eat",
+      // Studio cannot load the host cdylib: trivial stdlib matcher
+      // for the preview instead of the Rust function.
+      matchRange = { text, query ->
+        query.takeIf { it.isNotEmpty() }?.let { q ->
+          text.indexOf(q).takeIf { it >= 0 }?.let { IntRange(it, it + q.length - 1) }
+        }
+      },
     )
   }
 }

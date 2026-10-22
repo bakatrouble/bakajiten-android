@@ -36,12 +36,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bakajiten.app.data.AppSettings
+import com.bakajiten.app.data.cannedBackends
 import com.bakajiten.app.data.FakeDictionaryBackend
 import com.bakajiten.app.data.FakeFuriganaBackend
 import com.bakajiten.app.data.FakeKanjiBackend
 import com.bakajiten.app.data.FakeRecognizerBackend
 import com.bakajiten.app.data.Scope
 import com.bakajiten.app.data.SearchBarPosition
+import com.bakajiten.app.data.CannedShaping
 import com.bakajiten.app.state.Backends
 import com.bakajiten.app.theme.BakajitenTheme
 import com.bakajiten.app.ui.components.KanaFieldState
@@ -237,13 +239,10 @@ private fun PanelSlot(
 @Composable
 private fun SearchScreenPreview() {
   val fake = FakeDictionaryBackend()
-  val backends = Backends(
-    fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-    fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
-  )
+  val backends = cannedBackends(fake)
   var query by remember { mutableStateOf("たべる") }
   BakajitenTheme {
-    val previewField = remember(query) { KanaFieldState(query) }
+    val previewField = remember(query) { KanaFieldState(query, CannedShaping::kanaDisplay) }
     SearchScreen(
       query = query,
       field = previewField,
@@ -267,12 +266,9 @@ private fun SearchScreenPreview() {
 @Composable
 private fun SearchScreenBottomPreview() {
   val fake = FakeDictionaryBackend()
-  val backends = Backends(
-    fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-    fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
-  )
+  val backends = cannedBackends(fake)
   BakajitenTheme {
-    val previewFieldBottom = remember("あ") { KanaFieldState("あ") }
+    val previewFieldBottom = remember("あ") { KanaFieldState("あ", CannedShaping::kanaDisplay) }
     SearchScreen(
       query = "あ",
       field = previewFieldBottom,

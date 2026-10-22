@@ -27,7 +27,6 @@ class NavigationStackTest {
     val fake = FakeDictionaryBackend()
     val backends = Backends(
       fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-      fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
     )
     return AppViewModel(InMemorySettingsRepository(), backends)
   }

@@ -36,12 +36,6 @@ private fun createBackends(manager: DataManager): Backends {
         furigana = object : com.bakajiten.app.data.FuriganaBackend {
           override fun segment(head: String, reading: String) = RustLabels.furigana(head, reading)
         },
-        posLabel = RustLabels::posLabel,
-        posTip = RustLabels::posTip,
-        fieldLabel = RustLabels::fieldLabel,
-        fieldTip = RustLabels::fieldTip,
-        miscLabel = RustLabels::miscLabel,
-        miscTip = RustLabels::miscTip,
       )
     } else {
       fakeBackends()
@@ -60,12 +54,6 @@ private fun fakeBackends(): Backends {
     FakeKanjiBackend(),
     FakeRecognizerBackend(),
     FakeFuriganaBackend(),
-    fake::posLabel,
-    fake::posTip,
-    { "" },
-    { "" },
-    fake::miscLabel,
-    fake::miscTip,
   )
 }
 

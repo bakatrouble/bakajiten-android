@@ -35,7 +35,6 @@ class AppE2eTest {
     val fake = FakeDictionaryBackend()
     return Backends(
       fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-      fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
     )
   }
 

@@ -32,16 +32,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.bakajiten.app.data.cannedBackends
 import com.bakajiten.app.data.RomajiStyle
 import com.bakajiten.app.data.SearchHit
-import com.bakajiten.app.domain.displayReading
-import com.bakajiten.app.domain.displaySenses
-import com.bakajiten.app.domain.isCommonWord
-import com.bakajiten.app.domain.isKanaEntry
-import com.bakajiten.app.domain.numberedContentSenses
-import com.bakajiten.app.domain.preferKeb
-import com.bakajiten.app.domain.preferReb
-import com.bakajiten.app.domain.queryFor
 import com.bakajiten.app.state.Backends
 import com.bakajiten.app.ui.components.SenseRow
 
@@ -117,12 +110,7 @@ private fun ArticleSheet(
     onKanji: (String) -> Unit,
     romaji: RomajiStyle,
 ) {
-    val senses = displaySenses(
-        entry,
-        backends.posLabel, backends.posTip,
-        backends.fieldLabel, backends.fieldTip,
-        backends.miscLabel, backends.miscTip,
-    )
+    val rows = backends.displaySenses(entry)
     Column(
         Modifier
           .fillMaxSize()
@@ -131,17 +119,17 @@ private fun ArticleSheet(
           .testTag("article"),
     ) {
         HeadingBlock(
-            heading = preferKeb(entry, highlight),
-            reading = displayReading(
-                preferReb(entry, highlight),
-                romanize = romaji != RomajiStyle.KANA,
-                hepburn = romaji == RomajiStyle.HEPBURN,
+            heading = backends.preferKeb(entry, highlight),
+            reading = backends.displayReading(
+                backends.preferReb(entry, highlight),
+                romaji != RomajiStyle.KANA,
+                romaji == RomajiStyle.HEPBURN,
             ),
             // Ruby segments kana; a romanized reading shows plain.
             ruby = if (romaji == RomajiStyle.KANA) {
                 backends.furigana.segment(
-                    preferKeb(entry, highlight),
-                    preferReb(entry, highlight)
+                    backends.preferKeb(entry, highlight),
+                    backends.preferReb(entry, highlight)
                 )
             } else {
                 null
@@ -149,9 +137,9 @@ private fun ArticleSheet(
         )
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (isCommonWord(entry)) AssistChip(onClick = {}, label = { Text("common") })
+            if (backends.isCommonWord(entry)) AssistChip(onClick = {}, label = { Text("common") })
             if (entry.jlpt in 1..5) AssistChip(onClick = {}, label = { Text("N${entry.jlpt}") })
-            if (isKanaEntry(senses)) {
+            if (rows.firstOrNull()?.sense?.uk == true) {
                 AssistChip(
                     onClick = {},
                     label = { Text("kana", color = MaterialTheme.colorScheme.error) })
@@ -162,17 +150,17 @@ private fun ArticleSheet(
         // tooltips keep their taps).
         SelectionContainer {
             Column {
-                for (row in numberedContentSenses(senses)) {
-                    SenseRow(row, highlight)
+                for (row in rows) {
+                    SenseRow(row, highlight, matchRange = backends.matchRange)
                     for (ref in row.sense.xref) {
-                        XrefLine(ref, onSearch)
+                        XrefLine(ref, backends.queryFor, onSearch)
                     }
                     Spacer(Modifier.height(4.dp))
                 }
             }
         }
-        OtherForms(entry.kanji.map { it.keb }, entry.readings.map { it.reb }, onSearch)
-        KanjiLinks(preferKeb(entry, highlight), onKanji)
+        OtherForms(entry.kanji.map { it.keb }, entry.readings.map { it.reb }, backends.queryFor, onSearch)
+        KanjiLinks(backends.preferKeb(entry, highlight), onKanji)
     }
 }
 
@@ -213,7 +201,7 @@ private fun HeadingBlock(
 }
 
 @Composable
-private fun XrefLine(ref: String, onSearch: (String) -> Unit) {
+private fun XrefLine(ref: String, queryFor: (String) -> String, onSearch: (String) -> Unit) {
     Text(
         "see: $ref",
         style = MaterialTheme.typography.bodySmall,
@@ -224,7 +212,7 @@ private fun XrefLine(ref: String, onSearch: (String) -> Unit) {
 }
 
 @Composable
-private fun OtherForms(kanji: List<String>, readings: List<String>, onSearch: (String) -> Unit) {
+private fun OtherForms(kanji: List<String>, readings: List<String>, queryFor: (String) -> String, onSearch: (String) -> Unit) {
     if (kanji.size + readings.size <= 2) return
     Text("Other forms:", style = MaterialTheme.typography.labelMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -264,13 +252,7 @@ private fun KanjiLinks(heading: String, onKanji: (String) -> Unit) {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 private fun ArticleScreenPreview() {
     val fake = com.bakajiten.app.data.FakeDictionaryBackend()
-    val backends = com.bakajiten.app.state.Backends(
-        fake,
-        com.bakajiten.app.data.FakeKanjiBackend(),
-        com.bakajiten.app.data.FakeRecognizerBackend(),
-        com.bakajiten.app.data.FakeFuriganaBackend(),
-        fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
-    )
+    val backends = cannedBackends(fake)
     val hit = fake.searchIndices("たべる", com.bakajiten.app.data.SearchMode.EXACT, 5).first()
     com.bakajiten.app.theme.BakajitenTheme {
         ArticleScreen(hit, "たべる", backends, onSearch = {}, onKanji = {}, onBack = {})

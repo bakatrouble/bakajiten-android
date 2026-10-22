@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import com.bakajiten.app.data.CannedShaping
 
 // Search field row: IME kana input plus the handwriting toggle
 // (tonal fill while the panel is open). Affix/mode toggles live in
@@ -58,7 +59,7 @@ fun RecognizerToggleButton(recognizerOpen: Boolean, onRecognizer: () -> Unit) {
 @Composable
 private fun SearchFieldRowPreview() {
   com.bakajiten.app.theme.BakajitenTheme {
-    val field = KanaFieldState("taberu")
+    val field = KanaFieldState("taberu", CannedShaping::kanaDisplay)
     SearchFieldRow(field = field, onRaw = {}, meaning = false)
   }
 }

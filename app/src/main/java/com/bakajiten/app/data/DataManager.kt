@@ -9,7 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import uniffi.dict.glossVersion
-import uniffi.dict.kanjiVersions
+import uniffi.dict.kanjiVersion
 import uniffi.recognizer.templatesPackedAt
 
 // Artifact fetching: mirrors frontends/web Backend.ts. Nothing
@@ -32,6 +32,7 @@ data class ManifestFile(
   val size: Long,
   val sha256: String?,
   val version: String?,
+  val gz: Long = -1,
 )
 
 class DataManager(private val dir: File) {
@@ -45,10 +46,7 @@ class DataManager(private val dir: File) {
    * [localVersion] nulls that out.
    */
   private fun versionOf(name: String, path: String): String = when (name) {
-    "kanji.bin" -> {
-      val v = kanjiVersions(path)
-      if (v.kanjivg == "unknown") v.kanjidic2 else "${v.kanjidic2} · VG ${v.kanjivg}"
-    }
+    "kanji.bin" -> kanjiVersion(path)
     "templates.bin" -> packedDate(templatesPackedAt(path))
     else -> glossVersion(path)
   }
@@ -83,6 +81,7 @@ class DataManager(private val dir: File) {
                 size = o.optLong("size", -1),
                 sha256 = if (o.isNull("sha256")) null else o.optString("sha256"),
                 version = if (o.isNull("version")) null else o.optString("version"),
+                gz = o.optLong("gz", -1),
               ),
             )
           }

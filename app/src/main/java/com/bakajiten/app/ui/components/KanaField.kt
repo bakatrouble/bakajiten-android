@@ -5,8 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import com.bakajiten.app.domain.applyKanaEdit
-import com.bakajiten.app.domain.romajiDisplay
+import com.bakajiten.app.data.RustKana
 
 // IME field state (web `kanaField` parity): a raw romaji buffer
 // plus the display cursor. Typing converts through the buffer;
@@ -14,13 +13,16 @@ import com.bakajiten.app.domain.romajiDisplay
 // past the inserted text. External query changes (candidate picks
 // through the ViewModel, scope switches) resync the buffer.
 
-class KanaFieldState(initialRaw: String) {
+class KanaFieldState(
+  initialRaw: String,
+  private val displayFn: (String) -> String = RustKana::display,
+) {
   var raw by mutableStateOf(initialRaw)
     private set
   var selection by mutableStateOf(TextRange(initialRaw.length))
     private set
 
-  fun display(meaning: Boolean): String = if (meaning) raw else romajiDisplay(raw)
+  fun display(meaning: Boolean): String = if (meaning) raw else displayFn(raw)
 
   fun field(meaning: Boolean): TextFieldValue = TextFieldValue(display(meaning), selection)
 
@@ -30,7 +32,7 @@ class KanaFieldState(initialRaw: String) {
       selection = value.selection
       return
     }
-    val next = if (meaning) value.text else applyKanaEdit(raw, value.text)
+    val next = if (meaning) value.text else applyKanaEdit(raw, value.text, displayFn)
     if (next == raw) return
     raw = next
     val shown = display(meaning)
@@ -70,4 +72,32 @@ class KanaFieldState(initialRaw: String) {
       selection = TextRange(query.length)
     }
   }
+}
+
+/**
+ * Reconcile one field edit: the editable text is the converted
+ * display, so end-insertions arrive as literal suffixes (the typed
+ * key, not the converted result) and backspace arrives as a
+ * shorter string. End-backspace deletes one whole display
+ * character, walking raw back to the longest prefix that still
+ * renders it (never un-converting stepwise); any other shape
+ * (mid-string edits, selections) resets the buffer to the literal
+ * text. Field mechanics over an injected display fn — the
+ * conversion itself lives in Rust.
+ */
+internal fun applyKanaEdit(raw: String, newText: String, display: (String) -> String): String {
+  val disp = display(raw)
+  if (newText == disp) return raw
+  if (newText.length < disp.length) {
+    val want = disp.substring(0, disp.offsetByCodePoints(disp.length, -1))
+    if (newText == want) {
+      for (i in raw.length - 1 downTo 0) {
+        if (display(raw.substring(0, i)) == want) return raw.substring(0, i)
+      }
+      return if (raw.isNotEmpty()) raw.dropLast(1) else raw
+    }
+    return newText
+  }
+  if (newText.startsWith(disp)) return raw + newText.substring(disp.length)
+  return newText
 }

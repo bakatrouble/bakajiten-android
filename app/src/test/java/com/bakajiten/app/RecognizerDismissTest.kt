@@ -35,7 +35,6 @@ class RecognizerDismissTest {
     val fake = FakeDictionaryBackend()
     val backends = Backends(
       fake, FakeKanjiBackend(), FakeRecognizerBackend(), FakeFuriganaBackend(),
-      fake::posLabel, fake::posTip, { "" }, { "" }, fake::miscLabel, fake::miscTip,
     )
     val vm = AppViewModel(InMemorySettingsRepository(), backends)
     compose.setContent { BakajitenApp(vm = vm, backends = backends, widthClass = AdaptiveWidth.COMPACT) }
